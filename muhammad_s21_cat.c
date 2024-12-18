@@ -1,3 +1,48 @@
+#include <stdio.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <string.h>
+#include "s21_cat.h"
+
+void processFile(FILE *file, Flags flags) {
+    char buffer[4096];
+    int lineNumber = 1;
+    int lastLineEmpty = 0;
+
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        if (flags.flagS && strcmp(buffer, "\n") == 0) {
+            if (lastLineEmpty) {
+                continue;
+            }
+            lastLineEmpty = 1;
+        } else {
+            lastLineEmpty = 0;
+        }
+
+        if (flags.flagB && buffer[0] != '\n') {
+            printf("%6d\t", lineNumber++);
+        } else if (flags.flagN && !flags.flagB && buffer[1] != '\n') {
+            printf("%6d\t", lineNumber++);
+        }
+
+        for (char *p = buffer; *p != '\0'; p++) {
+            if (flags.flagT && *p == '\t') {
+                printf("^I");
+            } else if (flags.flagE && *p == '\n') {
+                printf("$\n");
+            } else if (flags.flagV && (*p < 32 || *p == 127)) {
+                if (*p == 127) {
+                    printf("^?");
+                } else {
+                    printf("^%c", *p + '@');
+                }
+            } else {
+                putchar(*p);
+            }
+        }
+    }
+}
+
 void parseArguments(int argc, char *argv[], opt_t *opt) {
     static struct option long_options[] = {
         {"number-nonblank", no_argument, 0, 'b'},
@@ -39,4 +84,24 @@ void parseArguments(int argc, char *argv[], opt_t *opt) {
         fprintf(stderr, "Expected file name after options\n");
         exit(EXIT_FAILURE);
     }
+}
+
+int main(int argc, char *argv[]) {
+    Flags flags = {0};
+    char *filename = NULL;
+
+    opt_t opt = {&flags, &filename};
+
+    parseArguments(argc, argv, &opt);
+
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Failed to open file");
+        exit(EXIT_FAILURE);
+    }
+
+    processFile(file, flags);
+
+    fclose(file);
+    return 0;
 }
